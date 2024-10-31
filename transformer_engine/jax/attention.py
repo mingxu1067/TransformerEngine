@@ -79,6 +79,19 @@ class QKVFormat(Enum):
     THD = NVTE_QKV_Format.NVTE_THD
 
 
+class CPStrategy(Enum):
+    """Defines the context parallel strategies of Jax fused attention.
+
+    DEFAULT: Default strategy will choose automatically if context parallel axis is sharded.
+    ALL_GATHER: All-gather/reduce scatter implementation.
+    RING: Ring attention implementation (https://arxiv.org/abs/2310.01889).
+    """
+
+    DEFAULT = 0
+    ALL_GATHER = 1
+    RING = 2
+
+
 def get_qkv_format(qkv_layout):
     """
     Get qkv_format from qkv_layout
@@ -266,6 +279,7 @@ def fused_attn(
     dropout_probability: float,
     is_training: bool,
     window_size: Optional[Tuple[int, int]] = None,
+    context_parallel_strategy: CPStrategy = CPStrategy.DEFAULT,
     context_parallel_causal_load_balanced: bool = False,
     context_parallel_axis: str = "",
 ):
@@ -353,6 +367,7 @@ def fused_attn(
         is_training=is_training,
         max_segments_per_seq=1,
         window_size=window_size,
+        context_parallel_strategy=context_parallel_strategy,
         context_parallel_causal_load_balanced=context_parallel_causal_load_balanced,
         context_parallel_axis=context_parallel_axis,
     )
@@ -376,6 +391,7 @@ def fused_attn_thd(
     is_training: bool,
     max_segments_per_seq: int = 1,
     window_size: Optional[Tuple[int, int]] = None,
+    context_parallel_strategy: CPStrategy = CPStrategy.DEFAULT,
     context_parallel_causal_load_balanced: bool = False,
     context_parallel_axis: str = "",
 ):
@@ -476,6 +492,7 @@ def fused_attn_thd(
         is_training=is_training,
         max_segments_per_seq=max_segments_per_seq,
         window_size=window_size,
+        context_parallel_strategy=context_parallel_strategy,
         context_parallel_causal_load_balanced=context_parallel_causal_load_balanced,
         context_parallel_axis=context_parallel_axis,
     )
@@ -483,7 +500,7 @@ def fused_attn_thd(
     return output
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(7, 8, 9, 10, 11, 12, 13, 14, 15, 16))
+@partial(jax.custom_vjp, nondiff_argnums=(7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17))
 def _fused_attn(
     qkv: Tuple[jnp.ndarray, ...],
     bias: Optional[jnp.ndarray],
@@ -500,6 +517,7 @@ def _fused_attn(
     is_training: bool,
     max_segments_per_seq: int,
     window_size: Optional[Tuple[int, int]],
+    context_parallel_strategy: CPStrategy,
     context_parallel_causal_load_balanced: bool,
     context_parallel_axis: str,
 ):
@@ -519,6 +537,7 @@ def _fused_attn(
         is_training,
         max_segments_per_seq,
         window_size,
+        context_parallel_strategy,
         context_parallel_causal_load_balanced,
         context_parallel_axis,
     )
@@ -541,6 +560,7 @@ def _fused_attn_fwd_rule(
     is_training,
     max_segments_per_seq,
     window_size,
+    context_parallel_strategy,
     context_parallel_causal_load_balanced,
     context_parallel_axis,
 ):
@@ -560,6 +580,7 @@ def _fused_attn_fwd_rule(
         is_training=is_training,
         max_segments_per_seq=max_segments_per_seq,
         window_size=window_size,
+        context_parallel_strategy=context_parallel_strategy,
         context_parallel_causal_load_balanced=context_parallel_causal_load_balanced,
         context_parallel_axis=context_parallel_axis,
     )
@@ -588,6 +609,7 @@ def _fused_attn_bwd_rule(
     is_training,
     max_segments_per_seq,
     window_size,
+    context_parallel_strategy,
     context_parallel_causal_load_balanced,
     context_parallel_axis,
     ctx,
@@ -623,6 +645,7 @@ def _fused_attn_bwd_rule(
         is_training=is_training,
         max_segments_per_seq=max_segments_per_seq,
         window_size=window_size,
+        context_parallel_strategy=context_parallel_strategy,
         context_parallel_causal_load_balanced=context_parallel_causal_load_balanced,
         context_parallel_axis=context_parallel_axis,
     )

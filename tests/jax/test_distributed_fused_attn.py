@@ -35,7 +35,9 @@ from transformer_engine.jax.attention import (
     get_qkv_format,
     reorder_causal_load_balancing,
     inverse_reorder_causal_load_balancing,
+    CPStrategy,
 )
+from transformer_engine.jax.sharding import MeshResource
 
 # We will use the golden reference model from our non distributed attention test fixture.
 from test_fused_attn import general_dot_product_attention, make_mask
@@ -402,6 +404,10 @@ class TestDistributedContextParallelSelfAttn:
         "load_balanced",
         [pytest.param(False, id="UNBALANCED"), pytest.param(True, id="BALANCED")],
     )
+    @pytest.mark.parametrize(
+        "cp_strategy",
+        [pytest.param(CPStrategy.ALL_GATHER, id="AG"), pytest.param(CPStrategy.RING, id="RING")],
+    )
     def test_contex_parallel_self_attn(
         self,
         device_count,
@@ -414,6 +420,7 @@ class TestDistributedContextParallelSelfAttn:
         dtype,
         qkv_layout,
         load_balanced,
+        cp_strategy,
     ):
         attn_bias_type = AttnBiasType.NO_BIAS
         dropout_prob = 0.0
@@ -461,6 +468,7 @@ class TestDistributedContextParallelSelfAttn:
                 scaling_factor=scaling_factor,
                 dropout_probability=dropout_prob,
                 is_training=is_training,
+                context_parallel_strategy=cp_strategy,
                 context_parallel_causal_load_balanced=load_balanced,
                 context_parallel_axis="cp",
             ).astype(dtype)
